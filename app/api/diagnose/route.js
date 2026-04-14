@@ -30,7 +30,7 @@ export async function POST(request) {
     prompt += '"swedenTips":["Tips om vinter/kyla/salt"],';
     prompt += '"youtubeSearch":"sökterm"}';
 
-    var apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+    var apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
 
     var r = await fetch(apiUrl, {
       method: "POST",
@@ -39,7 +39,7 @@ export async function POST(request) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 4096,
           responseMimeType: "application/json"
         }
       })
