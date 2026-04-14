@@ -69,16 +69,20 @@ export async function POST(request) {
 
     txt = txt.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
 
-    var match = txt.match(/\{[\s\S]*\}/);
-    if (!match) {
-      return Response.json({ error: "Inget JSON i svar: " + txt.substring(0, 100) }, { status: 502 });
-    }
-
     var parsed;
-    try {
-      parsed = JSON.parse(match[0]);
-    } catch (e) {
-      return Response.json({ error: "JSON-parse: " + e.message + " | " + match[0].substring(0, 100) }, { status: 502 });
+    try { parsed = JSON.parse(txt); } catch(e) { /* fall through to regex */ }
+
+    if (!parsed) {
+      var match = txt.match(/\{[\s\S]*\}/);
+      if (!match) {
+        return Response.json({ error: "Inget JSON i svar: " + txt.substring(0, 100) }, { status: 502 });
+      }
+
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch (e) {
+        return Response.json({ error: "JSON-parse: " + e.message + " | " + match[0].substring(0, 100) }, { status: 502 });
+      }
     }
 
     var result = {
