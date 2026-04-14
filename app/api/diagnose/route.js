@@ -16,7 +16,7 @@ export async function POST(request) {
     const prompt = "Du är en expert bilmekaniker i Sverige. Fordon: " + vehicle.make + " " + vehicle.model + " " + vehicle.year + ", Motor: " + (vehicle.engine || "okänd") + ", Bränsle: " + (vehicle.fuel || "okänt") + ". Felkoder: " + faultCodes + ". Svara ENBART med ren JSON (ingen markdown, inga backticks). Format: {\"severity\":\"low|medium|high|critical\",\"systemAffected\":\"Systemnamn\",\"title\":\"Diagnostitel\",\"description\":\"2-3 meningar\",\"faultCodes\":[{\"code\":\"PXXXX\",\"meaning\":\"Beskrivning\"}],\"probableCauses\":[\"Orsak 1\",\"Orsak 2\"],\"parts\":[{\"name\":\"Delnamn\",\"partNumber\":\"nr\",\"price\":250,\"supplier\":\"Biltema\"}],\"laborHours\":2.5,\"laborRate\":" + LABOR_RATE + ",\"steps\":[{\"title\":\"Steg\",\"description\":\"Beskrivning\",\"minutes\":15,\"type\":\"inspection|test|repair|replace\"}],\"safetyWarnings\":[\"Varning\"],\"swedenTips\":[\"Tips om vinter/kyla/salt\"],\"youtubeSearch\":\"sökterm\"}";
 
     const r = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
