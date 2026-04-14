@@ -13,43 +13,78 @@ export async function POST(request) {
 
     const LABOR_RATE = 700;
 
-    const prompt = "Du är en expert bilmekaniker i Sverige. Fordon: " + vehicle.make + " " + vehicle.model + " " + vehicle.year + ", Motor: " + (vehicle.engine || "okänd") + ", Bränsle: " + (vehicle.fuel || "okänt") + ". Felkoder: " + faultCodes + ". Svara ENBART med ren JSON (ingen markdown, inga backticks). Format: {\"severity\":\"low|medium|high|critical\",\"systemAffected\":\"Systemnamn\",\"title\":\"Diagnostitel\",\"description\":\"2-3 meningar\",\"faultCodes\":[{\"code\":\"PXXXX\",\"meaning\":\"Beskrivning\"}],\"probableCauses\":[\"Orsak 1\",\"Orsak 2\"],\"parts\":[{\"name\":\"Delnamn\",\"partNumber\":\"nr\",\"price\":250,\"supplier\":\"Biltema\"}],\"laborHours\":2.5,\"laborRate\":" + LABOR_RATE + ",\"steps\":[{\"title\":\"Steg\",\"description\":\"Beskrivning\",\"minutes\":15,\"type\":\"inspection|test|repair|replace\"}],\"safetyWarnings\":[\"Varning\"],\"swedenTips\":[\"Tips om vinter/kyla/salt\"],\"youtubeSearch\":\"sökterm\"}";
+    var prompt = "Du är en expert bilmekaniker i Sverige. ";
+    prompt += "Fordon: " + vehicle.make + " " + vehicle.model + " " + vehicle.year;
+    prompt += ", Motor: " + (vehicle.engine || "okänd");
+    prompt += ", Bränsle: " + (vehicle.fuel || "okänt");
+    prompt += ". Felkoder: " + faultCodes + ". ";
+    prompt += "Ge en professionell diagnos på svenska. ";
+    prompt += 'Svara med JSON: {"severity":"low|medium|high|critical","systemAffected":"Systemnamn",';
+    prompt += '"title":"Diagnostitel","description":"2-3 meningar",';
+    prompt += '"faultCodes":[{"code":"PXXXX","meaning":"Beskrivning"}],';
+    prompt += '"probableCauses":["Orsak 1","Orsak 2"],';
+    prompt += '"parts":[{"name":"Delnamn","partNumber":"nr","price":250,"supplier":"Biltema"}],';
+    prompt += '"laborHours":2.5,"laborRate":' + LABOR_RATE + ',';
+    prompt += '"steps":[{"title":"Steg","description":"Beskrivning","minutes":15,"type":"inspection"}],';
+    prompt += '"safetyWarnings":["Varning"],';
+    prompt += '"swedenTips":["Tips om vinter/kyla/salt"],';
+    prompt += '"youtubeSearch":"sökterm"}';
 
-    const r = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 2000 },
-        }),
-      }
-    );
+    var apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+
+    var r = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 2000,
+          responseMimeType: "application/json"
+        }
+      })
+    });
 
     if (!r.ok) {
-      return Response.json({ error: "Gemini API-fel: " + r.status }, { status: 502 });
+      var errBody = await r.text().catch(function() { return ""; });
+      return Response.json({ error: "Gemini API-fel: " + r.status + " " + errBody.substring(0, 200) }, { status: 502 });
     }
 
-    const data = await r.json();
-    const txt = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || "";
+    var data = await r.json();
 
-    const match = txt.match(/\{[\s\S]*\}/);
+    var txt = "";
+    var candidates = data.candidates || [];
+    if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts) {
+      var parts = candidates[0].content.parts;
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].text) {
+          txt += parts[i].text;
+        }
+      }
+    }
+
+    if (!txt) {
+      return Response.json({ error: "Tomt svar från AI" }, { status: 502 });
+    }
+
+    txt = txt.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+
+    var match = txt.match(/\{[\s\S]*\}/);
     if (!match) {
-      return Response.json({ error: "AI returnerade inget giltigt svar" }, { status: 502 });
+      return Response.json({ error: "Inget JSON i svar: " + txt.substring(0, 100) }, { status: 502 });
     }
 
     var parsed;
     try {
       parsed = JSON.parse(match[0]);
     } catch (e) {
-      return Response.json({ error: "Kunde ej tolka AI-svaret" }, { status: 502 });
+      return Response.json({ error: "JSON-parse: " + e.message + " | " + match[0].substring(0, 100) }, { status: 502 });
     }
 
     var result = {
       severity: parsed.severity || "medium",
-      systemAffected: parsed.systemAffected || "Okänt",
-      title: parsed.title || "Diagnostik",
+      systemAffected: parsed.systemAffected || "Okänt system",
+      title: parsed.title || "Diagnostikresultat",
       description: parsed.description || "",
       faultCodes: Array.isArray(parsed.faultCodes) ? parsed.faultCodes : [],
       probableCauses: Array.isArray(parsed.probableCauses) ? parsed.probableCauses : [],
@@ -59,7 +94,7 @@ export async function POST(request) {
       steps: Array.isArray(parsed.steps) ? parsed.steps : [],
       safetyWarnings: Array.isArray(parsed.safetyWarnings) ? parsed.safetyWarnings : [],
       swedenTips: Array.isArray(parsed.swedenTips) ? parsed.swedenTips : [],
-      youtubeSearch: parsed.youtubeSearch || "",
+      youtubeSearch: parsed.youtubeSearch || ""
     };
 
     return Response.json(result);
